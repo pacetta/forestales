@@ -1,0 +1,294 @@
+---
+title: "Resultados"
+author: "Ceaglio David"
+output: 
+  html_document:
+    css: "styles.css"
+
+---
+
+```{r setup, include=FALSE,  echo=F}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = F, comment = "")
+
+# Contrastes
+options(contrasts = c('contr.sum', 'contr.poly'))
+
+# paquetes requeridos
+pacman::p_load(rio, tidyverse, car, emmeans, writexl)
+```
+
+```{r, echo=F}
+datos <- import("carga de datos para R.xlsx")
+
+datos <- datos %>% 
+  mutate(bloque = as.factor(bloque), 
+         variedad = as.factor(variedad),
+         tratamiento = as.factor(tratamiento),
+         parcela  = as.factor(paste(bloque , variedad , sep= "-")))
+```
+
+
+```{r, echo=F}
+# medias
+# FALTA TASA DE SOBREVIVENCIA 
+
+mediana_datos <- datos %>% 
+  group_by(bloque,variedad,tratamiento)  %>% 
+  summarise(mediana_DAP = median(DAP, na.rm = TRUE),
+            Min_DAP = min(DAP, na.rm = TRUE),
+            Max_DAP = max(DAP, na.rm = TRUE),
+            desvio_DAP = sd(DAP, na.rm = TRUE),
+            mediana_ALT = median(ALT, na.rm = TRUE),
+            Min_ALT = min(ALT, na.rm = TRUE),
+            Max_ALT = max(ALT, na.rm = TRUE),
+            desvio_ALT = sd(ALT, na.rm = TRUE))
+
+# tabla de medias
+write_xlsx(mediana_datos, "mediana_datos.xlsx")
+```
+
+    desvio_ALT = sd(ALT, na.rm = TRUE))
+Tabla de medias generales
+```{r}
+as.data.frame.table(mediana_datos)
+```
+
+
+# Análisis de la variable **Diámetro a la altura del pecho (DAP)** medida en metros (m)
+
+_Nivel de significancia: 10%_
+
+## Gráficos
+
+```{r, echo=F}
+# grafico de medias 
+medias2 <- mediana_datos  %>% 
+  mutate(parcela  = as.factor(paste(bloque , variedad , sep= "-")))
+
+medias2 %>% 
+  ggplot(.)+
+  aes(x = variedad, y = mediana_DAP, color = tratamiento) +
+  geom_point() +
+  geom_line(aes(group = tratamiento), stat = "summary", fun.y = mean)+
+  labs(x = "Variedad", color = "Tratamiento", y =  "DAP (m)") 
+
+medias2 %>% 
+  ggplot(.)+
+  aes(x = tratamiento, y = mediana_DAP, color = variedad) +
+  geom_point() +
+  geom_line(aes(group = variedad), stat = "summary", fun.y = mean)+
+  labs(x = "Variedad", color = "Tratamiento", y =  "DAP (m)") 
+
+submuestreo <- datos  %>% 
+  mutate(parcela  = as.factor(paste(bloque , variedad , sep= "-")))
+```
+
+
+### Análisis  Bloque 3 (explicar situación particular en este bloque)
+
+```{r, echo=F}
+## solo bloque 3
+medias_bloque3 <- datos %>% 
+  filter(bloque == 3)  %>% 
+  group_by(variedad,tratamiento)  %>% 
+  summarise(DAPm = mean(DAP, na.rm = TRUE),
+            ALTm = mean(ALT, na.rm = TRUE)) 
+
+writexl::write_xlsx(medias_bloque3, "mediana_datos_bloque3.xlsx")
+
+medias_bloque3 %>% 
+  ggplot(.)+
+  aes(x = variedad, y = DAPm, color = tratamiento) +
+  geom_point() +
+  geom_line(aes(group = tratamiento), stat = "summary", fun.y = mean) +
+  labs(x = "Variedad", color = "Tratamiento", y =  "DAP (m)") 
+```
+
+## Ajuste de modelos
+
+```{r, echo=F, include=F}
+# modelo DAP
+# supuestos
+mtDAP <- aov(mediana_DAP ~ variedad*tratamiento, medias2)
+shapiro.test(resid(mtDAP))
+leveneTest(mtDAP)
+```
+
+```{r, echo=F}
+# anova
+mDAP <- aov(mediana_DAP ~ bloque + variedad*tratamiento  + 
+              Error(parcela), medias2)
+summary(mDAP)
+```
+
+### Comparación de medias
+
+```{r, echo=F}
+# medias DAP
+lsm_dap_i <- emmeans(mDAP, ~ tratamiento*variedad)
+lsm_dap_v <- emmeans(mDAP, ~ variedad)
+lsm_dap_t <- emmeans(mDAP, ~ tratamiento)
+```
+
+Comparacion entre tratamientos (factor significativo)
+```{r, echo=F}
+contrast(lsm_dap_t, method = "pairwise")
+```
+
+Comparacion entre tratamientos para cada variedad (ojo, interacción no fue significativo)
+```{r, echo=F}
+contrast(lsm_dap_i, method = "pairwise", by = "variedad") ## diferencia en CG08  (C vs T)
+```
+
+### Analisis de contrastes
+
+Matriz de contraste, a partir de los tratados (con )bajo manejo: subsolado y fertilización) se compara:
+
+1. El mejor clon (CG08) vs de semilla (Edunni)
+2. Promedio de respuesta de clones vs de semilla 
+3. Clones HH vs GG
+
+```{r,  echo=F}
+# levels(mediana_datos$variedad)
+K <- cbind(
+  C1 = c(   1,    0,-1,    0,    0),
+  C2 = c(-1/4, -1/4, 1, -1/4, -1/4),
+  C3 = c(   1,    1, 0,   -1,   -1)
+)
+
+lsm_dap_v <- emmeans(mDAP, ~ variedad)
+
+#colSums(K)
+#crossprod(K[ , 1], K[ , 2])
+contrast(lsm_dap_v, method = list(K))
+```
+(SOLO MIRAR LA SEGUNDA PARTE)
+
+- C1: Existen diferencias significativas entre el mejor clon (CG08) y el material de semilla (Edunni) (p = 0.06), con una diferencia positiva a favor del clon de 1.289 m más de DAP promedio
+
+- C2:No existen difernecias significativa entre la producción promedio de clones vs semilla (p= 0.32)
+
+- C3: Existen diferencias significativas entre los clones HH y GG (p = 0.027), con una diferencia positiva a favor de los HH de 2.21 m más de DAP promedio
+
+```{r}
+mediana_datos %>% 
+  filter(tratamiento == "T") %>% 
+  ggplot(.) +
+  aes(x= variedad , y = mediana_DAP)+
+  geom_point() +
+  geom_line(aes(group = tratamiento), stat = "summary", fun.y = mean)+
+  labs(x = "Variedad", color = "Tratamiento", y =  "DAP (m)") 
+```
+
+<br>
+
+<br>
+
+# Análisis de la variable **Altura** medida en metros (m)
+
+## Gráficos
+
+```{r}
+medias2 %>% 
+  ggplot(.)+
+  aes(x = variedad, y = mediana_ALT, color = tratamiento) +
+  geom_point() +
+  geom_line(aes(group = tratamiento), stat = "summary", fun.y = mean)+
+  labs(x = "Variedad", color = "Tratamiento", y =  "Altura (m)") 
+
+```
+
+### Análisis  Bloque 3 (explicar situación particular en este bloque)
+
+```{r, echo=F}
+## solo bloque 3
+medias_bloque3 %>% 
+  ggplot(.)+
+  aes(x = variedad, y = ALTm, color = tratamiento) +
+  geom_point() +
+  geom_line(aes(group = tratamiento), stat = "summary", fun.y = mean) +
+  labs(x = "Variedad", color = "Tratamiento", y =  "Altura (m)") 
+
+```
+
+## Ajuste de modelos
+
+```{r, echo=F, include=F}
+# modelo ALT
+# supuestos
+mtALT <- aov(mediana_ALT ~ variedad*tratamiento, medias2)
+shapiro.test(resid(mtALT))
+leveneTest(mtALT)
+```
+
+
+```{r, echo=F}
+# anova
+mALT <- aov(mediana_ALT ~ bloque+ variedad*tratamiento + Error(parcela), medias2)
+summary(mALT)
+```
+
+### Comparación de medias
+
+```{r}
+# medias ALT
+lsm_ai <- emmeans(mALT, ~ tratamiento*variedad)
+lsm_av <- emmeans(mALT, ~ variedad)
+lsm_at <- emmeans(mALT, ~ tratamiento)
+```
+
+Comparacion entre tratamientos (factor significativo)
+
+```{r}
+contrast(lsm_at, method = "pairwise")
+```
+
+Comparacion entre tratamientos para cada variedad (ojo, interacción no fue significativo)
+
+```{r}
+contrast(lsm_ai, method = "pairwise", by = "variedad")
+```
+### Analisis de contrastes
+
+Matriz de contraste, a partir de los tratados (con )bajo manejo: subsolado y fertilización) se compara:
+
+1. El mejor clon (CG08) vs de semilla (Edunni)
+2. Promedio de respuesta de clones vs de semilla 
+3. Clones HH vs GG
+
+```{r,  echo=F}
+# levels(mediana_datos$variedad)
+K <- cbind(
+  C1 = c(   1,    0,-1,    0,    0),
+  C2 = c(-1/4, -1/4, 1, -1/4, -1/4),
+  C3 = c(   1,    1, 0,   -1,   -1)
+)
+
+lsm_alt_int <- emmeans(mALT, ~ variedad|tratamiento)
+
+#colSums(K)
+#crossprod(K[ , 1], K[ , 2])
+Calt <- contrast(lsm_alt_int, method = list(K))
+Calt 
+```
+
+(SOLO MIRAR LA SEGUNDA PARTE)
+
+- C1: Existen diferencias significativas entre el mejor clon (CG08) y el material de semilla (Edunni) (p = 0.065), con una diferencia positiva a favor del clon de 1.03 m más de altura promedio
+
+- C2:No existen difernecias significativa entre la producción promedio de clones vs semilla (p= 0.24)
+
+- C3: Existen diferencias significativas entre los clones HH y GG (p = 0.05), con una diferencia positiva a favor de los HH de 1.538 m más de altura promedio
+
+```{r}
+mediana_datos %>% 
+  filter(tratamiento == "T") %>% 
+  ggplot(.) +
+  aes(x= variedad , y = mediana_ALT)+
+  geom_point() +
+  geom_line(aes(group = tratamiento), stat = "summary", fun.y = mean)+
+  labs(x = "Variedad", color = "Tratamiento", y =  "Altura (m)") 
+```
+
+# agregar analisis de supervivencia
+

@@ -1,0 +1,207 @@
+---
+title: "Resultados"
+author: "Ceaglio David"
+output: 
+  html_document:
+    css: "styles.css"
+---
+
+```{r setup, include=FALSE,  echo=F}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = F, comment = "")
+
+# Contrastes
+options(contrasts = c('contr.sum', 'contr.poly'))
+
+# paquetes requeridos
+
+pacman::p_load(rio, tidyverse, car, emmeans, writexl, cowplot, magick,nlme, agricolae, multcomp)
+```
+
+```{r, echo=F}
+datos <- import("Datos y Analisis La Lehmann Joni Dic 22_____1.xlsx")
+#datos <- import("La Lehmann Datos resumen CONFLAT.xlsx")
+
+datos <- datos %>% 
+  group_by(variedad, tratamiento, bloque) %>% 
+  mutate(ALT1 =    + ALT - mean(ALT, na.rm = T),
+         bloque = as.factor(bloque), 
+         variedad = as.factor(variedad),
+         tratamiento = as.factor(tratamiento),
+         parcela  = as.factor(paste(bloque , variedad , sep= "-")),
+         linea1 = case_when(
+           bloque ==1 ~ linea,
+           bloque ==2 ~ linea + 25,
+           bloque ==3 ~ linea + 50, 
+           bloque ==4 ~ linea + 75
+         ),
+         eje = paste(linea, variedad, tratamiento, linea1, sep=" - "))
+```
+
+```{r}
+ggplot(datos) +
+  aes(x= linea1 , y= -planta, color= ALT1) +
+  geom_point()+
+  coord_equal()
+```
+
+```{r}
+ ggplot(datos) +
+  aes(x= linea1 , y= -planta) +
+  stat_density_2d(aes(fill = ..density..), 
+                  geom = "raster", 
+                  contour = FALSE) +
+  scale_fill_distiller(palette= "Spectral", direction= -1) +
+  scale_x_continuous(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  theme(
+    legend.position='none'
+  )
+```
+
+```{r, fig.width = 12}
+#theme_set(theme_cowplot())
+theme_bw()
+#datos[datos$ALT == 0] <- NA
+
+gg1 <- datos %>% 
+  #filter(ALT >0) %>% 
+  mutate(ALT = replace(ALT, 0, NA)) %>% 
+  ggplot(.) +
+  aes(x= reorder(eje, linea1) , y= -planta, color = ALT) +
+  geom_point() +
+  scale_color_viridis_c() +
+  coord_equal() + 
+  geom_vline(xintercept = c(25.5,50.5, 75.5)) +
+  ylab("Planta") + xlab("Línea") + labs(color = "Altura (m)")+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5,hjust = 1,size = 8),
+#        axis.ticks.x = element_blank(),
+        legend.position="none") +
+  scale_x_discrete(labels = function(x) str_wrap(x, 25)) +
+  scale_colour_gradient(low = "green",  high = "red")
+
+gg1
+
+ggsave(filename = "diseño.png",plot = gg1)
+```
+
+```{r}
+gg <- ggplot(datos) +
+  aes(x= linea1 , y= -planta, color= ALT) +
+  geom_point() +
+  scale_color_viridis_c() +
+  coord_equal() + 
+  geom_vline(xintercept = c(25.5,50.5)) +
+  ylab("Planta") + xlab("Línea") + labs(color = "Altura (m)")+
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        legend.position="bottom") 
+
+gg
+
+ggdraw() +
+  draw_image("1234.png") +
+  draw_plot(gg)
+
+```
+
+# lineas completas
+
+```{r}
+medias_alt <- datos %>% 
+  filter(ALT > 0)%>%
+#  filter(bloque %in% c(1:4)) %>%
+  mutate(bloque = as.factor(bloque)) %>% 
+  group_by(bloque,variedad,tratamiento, parcela)  %>% 
+  summarise(media_ALT = mean(ALT, na.rm = TRUE),
+            mediana =median (ALT, na.rm = TRUE),
+            Min_ALT = min(ALT, na.rm = TRUE),
+            Max_ALT = max(ALT, na.rm = TRUE),
+            desvio_ALT = sd(ALT, na.rm = TRUE)) %>% 
+  filter(media_ALT> desvio_ALT)
+
+mALT_nl <- lme(media_ALT ~ variedad*tratamiento , 
+               random = ~ 1 | (bloque/variedad), medias_alt)
+anova(mALT_nl, type = "marginal")
+
+lsm_alt <- emmeans(mALT_nl, ~ variedad)
+C <- contrast(lsm_alt, method = "pairwise", adjust = "none")
+cld(lsm_alt, reversed = TRUE, Letters = LETTERS)
+plot(C)
+```
+
+## lineas mas representativas
+
+```{r}
+datos_linea <- datos %>% 
+  group_by(variedad, tratamiento, bloque, linea) %>% 
+  mutate(bloque = as.numeric(bloque), 
+         variedad = as.factor(variedad),
+         tratamiento = as.factor(tratamiento),
+#         linea = as.factor(linea),
+         parcela  = as.factor(paste(bloque , variedad , sep= "-"))) %>% 
+  filter(linea1 %in% c(4,3,7,8,12,11,17,16,23,39,38,28,30,46,48,34,35,45,41,61,65,66,70,59,56,54,51,72,71,77,80,91,93,98,97,90,85,83,96))
+
+# medias alt
+medias_alt2 <- datos_linea %>% 
+  filter(ALT > 0)%>%
+#  filter(bloque %in% c(1:4)) %>%
+  mutate(bloque = as.factor(bloque)) %>% 
+  group_by(bloque,variedad,tratamiento, parcela)  %>% 
+  summarise(media_ALT = mean(ALT, na.rm = TRUE),
+            mediana =median (ALT, na.rm = TRUE),
+            Min_ALT = min(ALT, na.rm = TRUE),
+            Max_ALT = max(ALT, na.rm = TRUE),
+            desvio_ALT = sd(ALT, na.rm = TRUE)) 
+
+mALT_nl <- lme(media_ALT ~ variedad*tratamiento , random = ~ 1 | (bloque/parcela), medias_alt2)
+anova(mALT_nl, type = "marginal")
+
+mALT_nl <- lme(mediana ~ variedad*tratamiento , random = ~ 1 | (bloque/parcela), medias_alt2)
+anova(mALT_nl, type = "marginal")
+
+lsm_alt <- emmeans(mALT_nl, ~ variedad)
+C <- contrast(lsm_alt, method = "pairwise", adjust = "none")
+cld(lsm_alt, reversed = TRUE, Letters = LETTERS)
+plot(C)
+```
+
+### Analisis de contrastes
+
+Matriz de contraste, a partir de los tratados (con )bajo manejo: subsolado y fertilización) se compara:
+
+1.  El mejor clon (CG08) vs de semilla (Edunni)
+2.  Promedio de respuesta de clones vs de semilla
+3.  Clones HH vs GG
+
+```{r,  echo=F}
+# levels(medias_alt2$variedad)
+K <- cbind(
+  C1 = c(   1,  -1, 0,   0,    0),
+  C2 = c(1, -1/4, -1/4, -1/4, -1/4),
+  C3 = c(0,   1,    1,   -1,   -1)
+)
+
+#colSums(K)
+#crossprod(K[ , 1], K[ , 2])
+Calt <- contrast(lsm_alt, method = list(K))
+Calt 
+plot(Calt)
+```
+
+```{r}
+# medias dap
+medias_dap <- datos_linea %>% 
+  mutate(bloque = as.factor(bloque)) %>% 
+  group_by(bloque,variedad,tratamiento, parcela)  %>% 
+  summarise(media = mean(DAP, na.rm = TRUE),
+            mediana =median (DAP, na.rm = TRUE),
+            Min = min(DAP, na.rm = TRUE),
+            Ma = max(DAP, na.rm = TRUE),
+            desvio = sd(DAP, na.rm = TRUE)) 
+
+mDAP_nl <- lme(media ~ variedad*tratamiento , random = ~ 1 | (bloque/parcela), medias_dap)
+anova(mDAP_nl, type = "marginal")
+
+#mDAP <- aov(media_ALT ~ bloque+ variedad*tratamiento, medias_alt2)
+#Anova(mDAP, type = "III")
+```

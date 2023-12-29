@@ -1,0 +1,144 @@
+body, td {
+   font-family: helvetica;
+   background-color: white;
+   font-size: 13pt;
+   margin: 8px;
+}
+
+tt, code, pre {
+   font-family: monospace;
+   font-size: 11pt;
+}
+
+h1 { 
+   font-size:1.4em;
+   font-weight: bold;
+}
+
+h2 { 
+   font-size:1.2em;
+   font-weight: bold;
+}
+
+h3 { 
+   font-size:1.1em; 
+   font-weight: bold;
+   font-style: normal !important;
+}
+
+h4 { 
+   font-size: 0.9em; 
+   font-weight: bold;
+   font-style: normal !important;
+}
+
+a:visited {
+   color: rgb(50%, 0%, 50%);
+}
+
+pre {	
+   margin-top: 0;
+   max-width: 95%;
+   border: 0px solid #ccc;
+   white-space: pre-wrap;
+}
+
+pre code {
+   display: block; 
+   padding: 0.5em;
+}
+
+pre.r {
+  color: blue;
+}
+
+code.r, code.cpp {
+   background-color: #F8F8F8;
+}
+
+table, td, th {
+  border: solid;
+  border-collapse:collapse;
+  border-width: 1px;
+  padding: 2px;
+  width: auto !important;
+}
+
+blockquote {
+   color:#666666;
+   margin:0;
+   padding-left: 1em;
+   border-left: 0.5em #EEE solid;
+}
+
+hr {
+   height: 1px;
+   border-bottom: none;
+   border-top-width: thin;
+   border-top-style: solid;
+   border-top-color: #999999;
+}
+
+.resp {
+  font-size: .9em;
+/*  font-style: italic; */
+  background-color: #F8F8F8;
+  padding-left: 1em;
+  border: 1px solid black;
+}
+
+
+@media print {
+   * { 
+      background: transparent !important; 
+      color: black !important; 
+      filter:none !important; 
+      -ms-filter: none !important; 
+   }
+   
+   h1 { 
+      font-size:12pt !important;
+   }
+   
+   body { 
+      font-size:10pt; 
+      max-width:100%; 
+   }
+       
+   hr { 
+      visibility: hidden;
+      page-break-before: avoid !important;
+   }
+
+   pre, blockquote { 
+      font-size:9pt; 
+      padding-right: 1em; 
+      page-break-inside: auto !important; 
+      page-break-before: avoid !important; 
+   }
+   
+   code.r, code.cpp {
+      background-color: #F8F8F8;
+      page-break-inside: auto !important; 
+      page-break-before: avoid !important; 
+   }
+
+   tr, img { 
+      page-break-inside: avoid; 
+   }
+
+   img { 
+      max-width: 100% !important; 
+   }
+
+   p, h2, h3 { 
+      orphans: 3; widows: 3; 
+   }
+
+   h2, h3 { 
+      page-break-after: avoid; 
+      page-break-before: avoid !important;
+   }
+   
+   #TOC { display: none; }
+}

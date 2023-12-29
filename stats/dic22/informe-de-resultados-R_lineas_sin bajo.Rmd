@@ -1,0 +1,332 @@
+---
+title: "Resultados"
+author: "Ceaglio David"
+output: 
+  html_document:
+    css: "styles.css"
+---
+
+```{r setup, include=FALSE,  echo=F}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = F, comment = "")
+
+# Contrastes
+options(contrasts = c('contr.sum', 'contr.poly'))
+
+# paquetes requeridos
+pacman::p_load(rio, tidyverse, car, emmeans, writexl, cowplot, magick,nlme, agricolae, multcomp)
+```
+
+## perdidas
+
+```{r}
+datos <- import("Datos y Analisis La Lehmann Joni Dic 22_____1.xlsx")
+
+vivas <- datos %>% 
+  group_by(tratamiento, variedad, linea) %>% 
+  filter(ALT > 0 | ALT != NA) %>% 
+  count() %>%
+  summarise(vivas = (n/36)*100) %>% 
+  group_by(tratamiento, variedad) %>% 
+  summarise(vivas = 100-mean(vivas))
+```
+
+
+```{r, echo=F}
+datos <- import("La Lehmann Datos resumen CONFLAT.xlsx")
+```
+
+## lineas mas representativas + sin bajo
+
+```{r}
+datos_linea <- datos %>% 
+  mutate(bloque = as.numeric(Bloque), 
+         variedad = as.factor(`Material Genético`),
+         tratamiento = as.factor(Manejo),
+         linea= Línea,
+         parcela  = as.factor(paste(bloque , variedad , sep= "-")),
+         linea1 = case_when(
+           bloque ==1 ~ linea,
+           bloque ==2 ~ linea + 25,
+           bloque ==3 ~ linea + 50, 
+           bloque ==4 ~ linea + 75
+         )) %>% 
+  filter(linea1 %in% c(4,3,7,8,12,11,17,16,23,39,38,28,30,46,48,34,35,45,41,61,65,66,70,59,56,54,51,72,71,77,80,91,93,98,97,90,85,83,96))
+
+mediagral <- datos_linea %>% 
+  filter(ALT > 0)%>%
+  mutate(bloque = as.factor(bloque)) %>% 
+#  group_by(variedad,tratamiento)  %>% 
+  group_by(variedad)  %>% 
+  summarise(media = mean(ALT, na.rm = TRUE), n = n()) 
+
+mediainter<- datos_linea %>% 
+  filter(ALT > 0)%>%
+  mutate(bloque = as.factor(bloque)) %>% 
+  group_by(variedad,tratamiento)  %>% 
+  summarise(media = mean(ALT, na.rm = TRUE),
+            desvio = sd(ALT, na.rm = TRUE), n = n()) 
+
+xxalt <- merge(mediagral, mediainter, by = "variedad")
+
+writexl::write_xlsx(xxalt,path = "ALT.xlsx")
+
+# medias alt
+medias_alt <- datos_linea %>% 
+  mutate(bloque = as.factor(bloque)) %>% 
+  group_by(variedad,tratamiento)  %>% 
+  summarise(media= mean(ALT, na.rm = TRUE),
+            desvio = sd(ALT, na.rm = TRUE))
+
+medias_alt2 <- datos_linea %>% 
+  filter(ALT > 0)%>%
+  mutate(bloque = as.factor(bloque)) %>% 
+  group_by(bloque,variedad,tratamiento, parcela)  %>% 
+  summarise(media_ALT = mean(ALT, na.rm = FALSE),
+            mediana =median (ALT, na.rm = TRUE),
+            Min_ALT = min(ALT, na.rm = TRUE),
+            Max_ALT = max(ALT, na.rm = TRUE),
+            desvio_ALT = sd(ALT, na.rm = TRUE)) 
+
+writexl::write_xlsx(medias_alt2,path = "forestal_alt.xlsx")
+
+
+mALT_nl <- lme(media_ALT ~ variedad*tratamiento , 
+               random = ~ 1 | (bloque/variedad), medias_alt2)
+anova(mALT_nl, type = "marginal")
+```
+
+
+```{r}
+lsm_alt <- emmeans(mALT_nl, ~ variedad)
+C <- contrast(lsm_alt, method = "pairwise", adjust = "none")
+C
+
+cld <- cld(lsm_alt, reversed = TRUE, Letters = LETTERS, alpha = 0.1, adjust = "none")
+cld
+```
+
+```{r}
+medias_alt2 %>% 
+  ggplot(.)+
+  aes(x = variedad, y = media_ALT, color = tratamiento) +
+  geom_boxplot()+
+#  geom_point() +
+#  geom_line(aes(group = tratamiento), stat = "summary", fun.y = mean)+
+  labs(x = "Variedad", color = "Manejo", y =  "Altura (m)")+
+    theme(legend.position = "bottom")+
+  scale_color_discrete(labels=c('Control', 'Tratado'))
+```
+
+### Analisis de contrastes
+
+Matriz de contraste, a partir de los tratados (con )bajo manejo: subsolado y fertilización) se compara:
+
+1. El mejor clon (CG08) vs de semilla (Edunni)
+2. Promedio de respuesta de clones vs de semilla 
+3. Clones HH vs GG
+
+```{r,  echo=F}
+# levels(medias_alt2$variedad)
+K <- cbind(
+  C1 = c(   -1,  1, 0,   0,    0),
+  C2 = c(-1, 1/4, 1/4, 1/4, 1/4),
+  C3 = c(0,   1,    1,   -1,   -1)
+)
+
+#colSums(K)
+#crossprod(K[ , 1], K[ , 2])
+Calt <- contrast(lsm_alt, method = list(K))
+Calt 
+```
+
+
+```{r}
+# set up model
+model <- mALT_nl
+
+# get (adjusted) means
+model_means <- lsm_alt
+
+# add letters to each mean
+model_means_cld <- cld(object = model_means,
+                       adjust = "none",
+                       Letters = letters,
+                       alpha = 0.1)
+# show output
+model_means_cld
+
+# format output for ggplot
+model_means_cld <- model_means_cld %>% 
+  as.data.frame()
+```
+
+
+```{r}
+# get ggplot
+ggplot(data = model_means_cld,
+       aes(x = variedad, y = emmean, fill = variedad)) +
+  geom_bar(stat = "identity", color = "black", show.legend = FALSE,
+           width=0.5, position = position_dodge(width=0.5)) +
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE), width = 0.2) +
+  scale_y_continuous(
+    name = "Altura (m) adj. media ± 1 desvío",
+    expand = expansion(mult = c(0, 0.1)),
+#    labels = scales::number_format(accuracy = 0.4),
+    limits = c(0,5)) +
+  xlab(NULL) +
+  labs(x = "Material Genético") +
+  #\n *similiar letra: no se detectan diferencias significativas con el Test de LSD*") +
+  geom_text(aes(label = str_trim(.group), y = emmean + SE), vjust = -0.5) +
+#  scale_fill_manual(values = c("midnightblue", "dodgerblue4", "steelblue3", 'lightskyblue')) +
+  theme_classic() +
+  theme(
+    panel.border = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.background = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.line = element_line(),
+    axis.text.x = element_text(size=15),
+    axis.title.x = element_text(size = 15),
+    axis.title.y = element_text(size = 15)
+  ) +
+  theme(legend.title = element_blank(),
+        legend.position = "none")+
+  scale_fill_grey()
+#  scale_fill_brewer(palette="Set3")
+
+ggsave(file="barras.png", width=6, height=4, dpi=300)
+```
+```{r}
+# get ggplot
+ggplot(data = model_means_cld,
+       aes(x = variedad, y = emmean, fill = variedad)) +
+  geom_bar(stat = "identity", color = "black", show.legend = FALSE,
+           width=0.5, position = position_dodge(width=0.5)) +
+  scale_y_continuous(
+    name = "Altura (m)",
+    expand = expansion(mult = c(0, 0.1)),
+#    labels = scales::number_format(accuracy = 0.4),
+    limits = c(0,5)) +
+  xlab(NULL) +
+  labs(x = "Material Genético") +
+  #\n *similiar letra: no se detectan diferencias significativas con el Test de LSD*") +
+  geom_text(aes(label = str_trim(.group), y = emmean + SE), vjust = -0) +
+#  scale_fill_manual(values = c("midnightblue", "dodgerblue4", "steelblue3", 'lightskyblue')) +
+  theme_classic() +
+  theme(
+    panel.border = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.background = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.line = element_line(),
+    axis.text.x = element_text(size=15),
+    axis.title.x = element_text(size = 15),
+    axis.title.y = element_text(size = 15)
+  ) +
+  theme(legend.title = element_blank(),
+        legend.position = "none") # +
+#  scale_fill_grey()
+#  scale_fill_brewer(palette="Set3")
+
+ggsave(file="barras sin error.png", width=6, height=4, dpi=300)
+```
+
+
+```{r}
+medias_alt %>% 
+  ggplot(.)+
+  aes(x = variedad, y = media, fill = tratamiento) +
+  geom_col(position= "dodge") +
+  labs(x = "Material Genético", fill = "Manejo de suelo", y =  "Altura (m)")+
+  scale_y_continuous(limits = c(0,5)) +
+#  scale_fill_discrete(labels=c('Sin subsolado', 'Con subsolado'))+
+  scale_fill_discrete(labels=c('Control', 'Tratado'))+
+  scale_fill_grey()+
+     theme(
+    panel.border = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.background = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.line = element_line(),
+    axis.text.x = element_text(size=15),
+    axis.title.x = element_text(vjust = 0, size = 15),
+    axis.title.y = element_text(size = 15),
+    legend.position = c(0.90, 0.90)
+  )
+
+ggsave(file="alt.png", width=6, height=4, dpi=300)
+
+```
+
+
+------------------------------
+
+DAP
+
+```{r}
+mediasDAP <- datos_linea %>% 
+  mutate(bloque = as.factor(bloque)) %>% 
+  group_by(variedad,tratamiento)  %>% 
+  summarise(media= mean(DAP, na.rm = TRUE)) 
+
+mediagral <- datos_linea %>% 
+  mutate(bloque = as.factor(bloque)) %>% 
+  group_by(variedad)  %>% 
+  summarise(media = mean(DAP, na.rm = TRUE),
+            desvio = sd(DAP, na.rm = TRUE))
+
+mediainter<- datos_linea %>% 
+  mutate(bloque = as.factor(bloque)) %>% 
+  group_by(variedad,tratamiento)  %>% 
+  summarise(media = mean(DAP, na.rm = TRUE),
+            desvio = sd(DAP, na.rm = TRUE) )
+
+xxdap <- merge(mediagral, mediainter, by = "variedad")
+
+writexl::write_xlsx(xxdap,path = "DAP.xlsx")
+
+# medias dap
+medias_dap <- datos_linea %>% 
+  mutate(bloque = as.factor(bloque)) %>% 
+  group_by(bloque,variedad,tratamiento, parcela)  %>% 
+  summarise(media = mean(DAP, na.rm = TRUE),
+            mediana =median (DAP, na.rm = TRUE),
+            Min = min(DAP, na.rm = TRUE),
+            Ma = max(DAP, na.rm = TRUE),
+            desvio = sd(DAP, na.rm = TRUE)) 
+
+mDAP_nl <- lme(media ~ variedad*tratamiento , random = ~ 1 | (bloque/variedad), medias_dap)
+anova(mDAP_nl, type = "marginal")
+
+lsm_dap_v <- emmeans(mDAP_nl, ~ variedad)
+
+lsm_dap <- emmeans(mDAP_nl, ~ tratamiento)
+```
+
+```{r}
+mediasDAP %>% 
+  ggplot(.)+
+  aes(x = variedad, y = media, fill = tratamiento) +
+#  geom_boxplot()+
+#  geom_point() +
+#   geom_line(aes(group = tratamiento), stat = "summary", fun.y = mean)+
+  geom_col(position= "dodge") +
+  labs(x = "Material Genético", fill = "Manejo de suelo", y =  "DAP (cm)")+
+  scale_y_continuous(limits = c(0,5)) +
+#  scale_color_discrete(labels=c('Sin subsolado', 'Con subsolado'))+
+  scale_fill_discrete(labels=c('Control', 'Tratado'))+
+    scale_fill_grey()+
+     theme(
+    panel.border = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.background = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.line = element_line(),
+    axis.text.x = element_text(size=15),
+    axis.title.x = element_text(vjust = 0, size = 15),
+    axis.title.y = element_text(size = 15),
+    legend.position = c(0.90, 0.90)
+  )
+ggsave(file="dap.png", width=6, height=4, dpi=300)
+
+```

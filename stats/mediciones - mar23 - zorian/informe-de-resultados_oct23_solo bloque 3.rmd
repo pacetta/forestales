@@ -1,0 +1,144 @@
+---
+title: "Resultados mediciones 2023"
+author: "Maximiliano Zorian"
+output:
+  word_document: default
+  html_document:
+    css: styles.css
+---
+
+```{r setup, include=FALSE,  echo=F}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = F, comment = "")
+
+# Contrastes
+options(contrasts = c('contr.sum', 'contr.poly'))
+
+# paquetes requeridos
+pacman::p_load(rio, tidyverse, car, emmeans, writexl, cowplot, magick,nlme, agricolae, multcomp)
+```
+
+## datos
+
+```{r}
+datos <- import("carga de datos para R 2023.xlsx") %>% 
+  mutate(bloque = as.factor(bloque),
+         variedad = as.factor(variedad),
+         tratamiento = as.factor(tratamiento), 
+         ALT = as.numeric(ALT),
+         DAP = as.numeric(DAP)) %>% 
+  filter(bloque == "3")
+```
+
+
+
+# Altura
+
+```{r}
+media_variedad <- datos %>% 
+  filter(ALT > 0)%>%
+  group_by(variedad)  %>% 
+  summarise(media = mean(ALT, na.rm = FALSE), 
+            desvio = sd(ALT),
+            n = n())
+
+media_variedad
+```
+
+```{r}
+media_trat <- datos %>% 
+  filter(ALT > 0)%>%
+  group_by(tratamiento)  %>% 
+  summarise(media = mean(ALT, na.rm = FALSE), 
+            desvio = sd(ALT),
+            n = n())
+
+media_trat
+```
+
+
+```{r}
+media_inter<- datos %>% 
+  filter(ALT > 0)%>%
+  group_by(variedad,tratamiento)  %>% 
+  summarise(media = mean(ALT, na.rm = TRUE),
+            desvio = sd(ALT, na.rm = TRUE), 
+            n = n()) 
+
+media_inter
+```
+
+## Graficos
+
+Tratado y control 
+SOLO BLOQUE 3
+
+```{r}
+datos %>% 
+  ggplot(.) +
+  aes(x = ALT, y = variedad) + 
+  geom_boxplot()
+```
+
+
+- Solo Tratado
+
+```{r}
+datos %>% 
+  filter(tratamiento == "T") %>% 
+  ggplot(.) +
+  aes(x = ALT, y = variedad) + 
+  geom_boxplot()
+```
+```{r}
+datos %>% 
+  ggplot(.) +
+  aes(y = ALT, x = variedad, color = tratamiento) + 
+ # geom_point() +
+  geom_line(aes(group = tratamiento), stat = "summary", fun.y = mean)+
+  labs(x = "Variedad", color = "Manejo", y =  "Altura (m)")+
+    theme(legend.position = "bottom")+
+  scale_color_discrete(labels=c('Control', 'Tratado'))
+  
+```
+
+
+```{r}
+datos %>% 
+  ggplot(.)+
+  aes(x = variedad, y = ALT) +
+  geom_boxplot()+
+#  geom_point() +
+#  geom_line(aes(group = tratamiento), stat = "summary", fun.y = mean)+
+  labs(x = "Variedad", y =  "Altura (m)")+
+    theme(legend.position = "bottom") #+
+  #scale_color_discrete(labels=c('Control', 'Tratado'))
+```
+
+
+------------------------------
+
+# DAP
+
+```{r}
+medias_dap <- datos %>% 
+  mutate(bloque = as.factor(bloque)) %>% 
+  group_by(variedad,tratamiento, bloque)  %>% 
+  summarise(media= mean(DAP, na.rm = TRUE)) 
+
+mediagral <- datos %>% 
+  mutate(bloque = as.factor(bloque)) %>% 
+  group_by(variedad)  %>% 
+  summarise(media = mean(DAP, na.rm = TRUE),
+            desvio = sd(DAP, na.rm = TRUE))
+
+mediainter<- datos %>% 
+  mutate(bloque = as.factor(bloque)) %>% 
+  group_by(variedad,tratamiento)  %>% 
+  summarise(media = mean(DAP, na.rm = TRUE),
+            desvio = sd(DAP, na.rm = TRUE) )
+
+
+xxdap <- merge(mediagral, mediainter, by = "variedad")
+writexl::write_xlsx(xxdap,path = "DAP.xlsx")
+```
+

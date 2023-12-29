@@ -1,0 +1,80 @@
+---
+title: "Resultados"
+author: "Ceaglio David"
+output: 
+  html_document:
+    css: "styles.css"
+---
+
+```{r setup, include=FALSE,  echo=F}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = F, comment = "")
+
+# Contrastes
+options(contrasts = c('contr.sum', 'contr.poly'))
+
+# paquetes requeridos
+
+pacman::p_load(rio, tidyverse, car, emmeans, writexl, sp, gstat, cowplot)
+```
+
+```{r, echo=F}
+datos <- import("Datos Infostat joni 30-6-22.xlsx")
+datos <- import("Dimensionamiento San Agustin 2021 Datos FINALES.xlsx")
+datos <- datos %>% 
+  group_by(variedad, tratamiento, bloque) %>% 
+  mutate(ALT1 =    + ALT - mean(ALT, na.rm = T),
+         bloque = as.factor(bloque), 
+         variedad = as.factor(variedad),
+         tratamiento = as.factor(tratamiento),
+         parcela  = as.factor(paste(bloque , variedad , sep= "-")),
+         linea1 = case_when(
+           bloque ==1 ~ linea,
+           bloque ==2 ~ linea + 25,
+           bloque ==3 ~ linea + 50, 
+           bloque ==4 ~ linea + 80
+         ))
+
+ALT <- datos$ALT
+#ve <- variogram(ALT, coordinates(datos) )
+#show.vgms()
+
+```
+
+```{r}
+ggplot(datos) +
+  aes(x= linea1 , y= -planta, color= ALT1) +
+  geom_point()+
+  coord_equal()
+```
+
+
+```{r}
+theme_set(theme_cowplot())
+
+gg <- ggplot(datos) +
+  aes(x= linea1 , y= -planta, color= ALT) +
+  geom_point() +
+  scale_color_viridis_c() +
+  coord_equal() + 
+  geom_vline(xintercept = c(25.5,45.5)) +
+  ylab("Planta") + xlab("Línea") + labs(color = "Altura (m)")+
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        legend.position="none") 
+
+gg
+
+gg2 <- ggplot(datos) +
+  aes(x= linea1 , y= -planta, color= ALT1) +
+#  geom_point()+
+   theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        legend.position="none") +
+  coord_equal()
+
+ggdraw() +
+  draw_image("1234.png") +
+  draw_plot(gg2)
+
+```
+

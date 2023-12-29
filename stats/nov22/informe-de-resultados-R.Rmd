@@ -1,0 +1,157 @@
+---
+title: "Resultados"
+author: "Ceaglio David"
+output: 
+  html_document:
+    css: "styles.css"
+---
+
+```{r setup, include=FALSE,  echo=F}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = F, comment = "")
+
+# Contrastes
+options(contrasts = c('contr.sum', 'contr.poly'))
+
+# paquetes requeridos
+
+pacman::p_load(rio, tidyverse, car, emmeans, writexl, cowplot, magick)
+```
+
+```{r, echo=F}
+datos <- import("Datos Infostat joni 30-6-22.xlsx")
+datos <- import("Dimensionamiento San Agustin 2021 Datos FINALES.xlsx")
+
+datos <- datos %>% 
+  group_by(variedad, tratamiento, bloque) %>% 
+  mutate(ALT1 =    + ALT - mean(ALT, na.rm = T),
+         bloque = as.factor(bloque), 
+         variedad = as.factor(variedad),
+         tratamiento = as.factor(tratamiento),
+         parcela  = as.factor(paste(bloque , variedad , sep= "-")),
+         linea1 = case_when(
+           bloque ==1 ~ linea,
+           bloque ==2 ~ linea + 25,
+           bloque ==3 ~ linea + 50, 
+           bloque ==4 ~ linea + 80
+         ))
+```
+
+```{r}
+ggplot(datos) +
+  aes(x= linea1 , y= -planta, color= ALT1) +
+  geom_point()+
+  coord_equal()
+```
+
+
+```{r}
+ ggplot(datos) +
+  aes(x= linea1 , y= -planta) +
+  stat_density_2d(aes(fill = ..density..), 
+                  geom = "raster", 
+                  contour = FALSE) +
+  scale_fill_distiller(palette= "Spectral", direction= -1) +
+  scale_x_continuous(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  theme(
+    legend.position='none'
+  )
+```
+
+```{r}
+theme_set(theme_cowplot())
+
+gg <- ggplot(datos) +
+  aes(x= linea1 , y= -planta, color= ALT) +
+  geom_point() +
+  scale_color_viridis_c() +
+  coord_equal() + 
+  geom_vline(xintercept = c(25.5,50.5)) +
+  ylab("Planta") + xlab("Línea") + labs(color = "Altura (m)")+
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        legend.position="bottom") 
+
+gg
+
+ggdraw() +
+  draw_image("1234.png") +
+  draw_plot(gg)
+
+```
+
+
+```{r}
+datos <- import("Datos Infostat joni 30-6-22.xlsx")
+datos1 <- datos1 %>% 
+  group_by(variedad, tratamiento, bloque, linea) %>% 
+  mutate(bloque = as.factor(bloque), 
+         variedad = as.factor(variedad),
+         tratamiento = as.factor(tratamiento),
+#         linea = as.factor(linea),
+         parcela  = as.factor(paste(bloque , variedad , sep= "-"))) %>% 
+  filter(linea < 15)
+```
+
+
+```{r}
+datos2 <- datos %>% 
+  filter(linea < 9) %>% 
+  mutate(bloque = as.factor(bloque), 
+         variedad = as.factor(variedad),
+         tratamiento = as.factor(tratamiento),
+         parcela  = as.factor(paste(bloque , variedad , sep= "-")))
+
+# medias
+medias_alt2 <- datos2 %>% 
+  filter(ALT > 0)%>%
+  group_by(bloque,variedad,tratamiento, parcela)  %>% 
+  summarise(media_ALT = mean(ALT, na.rm = TRUE),
+            Min_ALT = min(ALT, na.rm = TRUE),
+            Max_ALT = max(ALT, na.rm = TRUE),
+            desvio_ALT = sd(ALT, na.rm = TRUE)) 
+
+mDAP <- aov(media_ALT ~ bloque+ variedad*tratamiento + Error(parcela), medias_alt2)
+summary(mDAP)
+```
+
+
+
+----------------
+
+
+TODOS LOS BLOQUES
+```{r, echo=F}
+# anova
+mDAP <- aov(media_ALT ~ bloque+ variedad*tratamiento, medias_alt)
+summary(mDAP)
+
+library(nlme)
+mDAP_nl <- lme(media_ALT ~ variedad*tratamiento , random = ~ 1 | (bloque), medias_alt)
+anova(mDAP_nl)
+```
+
+BLOQUE 1
+```{r, echo=F}
+mDAP_nl1 <- lme(media_ALT ~ variedad*tratamiento , random = ~ 1 | (linea), medias_alt, subset = bloque == "1")
+anova(mDAP_nl1)
+```
+
+BLOQUE 2
+```{r, echo=F}
+mDAP_nl2 <- lme(media_ALT ~ variedad*tratamiento , random = ~ 1 | (linea), medias_alt, subset = bloque == "2")
+anova(mDAP_nl2)
+```
+
+BLOQUE 3
+```{r, echo=F}
+mDAP_nl3 <- lme(media_ALT ~ variedad*tratamiento , random = ~ 1 | (linea), medias_alt, subset = bloque == "3")
+anova(mDAP_nl3)
+```
+
+BLOQUE 4
+```{r, echo=F}
+mDAP_nl4 <- lme(media_ALT ~ variedad*tratamiento , random = ~ 1 | (linea), medias_alt, subset = bloque == "4")
+anova(mDAP_nl4)
+```
+
