@@ -1,0 +1,62 @@
+---
+title: "conteo"
+format: html
+editor: source
+---
+
+## En r
+
+```{r}
+# Instalar paquetes si no están instalados
+# install.packages("EBImage")
+# install.packages("magick")
+
+# Cargar bibliotecas
+pacman::p_load(imager)
+
+# Leer la imagen de Google Maps
+imagen <- load.image("imagen_google_maps.jpg")
+
+# Convertir la imagen a escala de grises
+gris <- grayscale(imagen)
+
+# Aplicar umbral para resaltar los píxeles que probablemente representen árboles
+umbral <- grayscale(gris > 0.4)
+
+# Encontrar y contar los objetos en la imagen
+objetos <- bwlabel(umbral)
+
+# Contar el número de árboles
+cantidad_arboles <- max(objetos)
+
+print(paste("Cantidad de árboles:", cantidad_arboles))
+```
+
+## en phython
+
+```{python}
+# Importar bibliotecas
+import cv2
+import numpy as np
+
+# Leer la imagen de Google Maps
+imagen = cv2.imread("imagen_google_maps.jpg")
+
+# Convertir la imagen a escala de grises
+gris = cv2.cvtColor(imagen, cv2.COLOR_BGR2GRAY)
+
+# Aplicar umbral para resaltar los píxeles que probablemente representen árboles
+_, umbral = cv2.threshold(gris, 100, 255, cv2.THRESH_BINARY_INV)
+
+# Encontrar y contornear los objetos en la imagen
+contornos, _ = cv2.findContours(umbral, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+# Dibujar los contornos en la imagen original
+imagen_contornos = cv2.drawContours(imagen, contornos, -1, (0, 255, 0), 2)
+
+# Contar el número de árboles
+cantidad_arboles = len(contornos)
+
+print("Cantidad de árboles:", cantidad_arboles)
+```
+
