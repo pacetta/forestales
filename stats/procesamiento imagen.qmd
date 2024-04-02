@@ -13,24 +13,30 @@ editor: source
 
 # Cargar bibliotecas
 pacman::p_load(imager)
+install.packages("raster")
+install.packages("rgdal")
 
-# Leer la imagen de Google Maps
-imagen <- load.image("imagen_google_maps.jpg")
+library(raster)
+library(rgdal)
+# Especifica la ruta al archivo TIFF descargado
+ruta_tiff <- "ruta/al/archivo/b1_imagen_landsat.tif"
 
-# Convertir la imagen a escala de grises
-gris <- grayscale(imagen)
+# Lee el archivo TIFF
+imagen_landsat <- raster(ruta_tiff)
+# Define el polígono de interés (ROI) como un objeto SpatialPolygonsDataFrame
+poligono <- readOGR(dsn = "ruta/a/tu/carpeta", layer = "nombre_del_archivo_shapefile")
 
-# Aplicar umbral para resaltar los píxeles que probablemente representen árboles
-umbral <- grayscale(gris > 0.4)
+# Extrae los valores de los píxeles dentro del polígono
+valores_pixeles <- extract(imagen_landsat, poligono)
 
-# Encontrar y contar los objetos en la imagen
-objetos <- bwlabel(umbral)
+# Suma los valores de los píxeles dentro del polígono
+conteo_puntos <- sum(valores_pixeles, na.rm = TRUE)
 
-# Contar el número de árboles
-cantidad_arboles <- max(objetos)
+# Imprime el resultado del conteo de puntos
+print(paste("Cantidad de puntos dentro del polígono:", conteo_puntos))
 
-print(paste("Cantidad de árboles:", cantidad_arboles))
 ```
+
 
 ## en phython
 
